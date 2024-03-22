@@ -1,0 +1,6 @@
+hypothesis
+pytest
+pygame~=2.5.1
+mido
+python-ta>=2.7.0
+black~=23.7.0

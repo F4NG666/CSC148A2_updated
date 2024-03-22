@@ -1,0 +1,14 @@
+class player:
+    def __init__(self,name):
+        self.name = name
+        self.score_history = []
+
+    def add_score(self, score:int):
+        self.score_history.append(score)
+        if len(self.score_history) == 100
+            self.score_history.pop{}
+
+    def average(self,n:int)-> float:
+    '''precondition n !=0 or greater than the length of file'''
+        return sum(self.score_history[:-n]) / len(self.score_historty[:-n])
+
