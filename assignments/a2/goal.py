@@ -22,7 +22,6 @@ Module Description:
 This file contains the hierarchy of Goal classes and related helper functions.
 """
 from __future__ import annotations
-import math
 import random
 from block import Block
 from settings import colour_name, COLOUR_LIST
@@ -38,13 +37,14 @@ def generate_goals(num_goals: int) -> list[Goal]:
     Preconditions:
     - num_goals <= len(COLOUR_LIST)
     """
-    # TODO: Implement this function
+    #  Implement this function
     goals = []
-    colour_indices = random.sample(range(len(COLOUR_LIST)), num_goals)
-    for i in colour_indices:
-        colour = COLOUR_LIST[i]
-        goal_type = random.choice([BlobGoal, PerimeterGoal])
-        goals.append(goal_type(colour))
+    color_lst = COLOUR_LIST.copy()
+    for _ in range(num_goals):
+        colour = random.choice(color_lst)
+        color_lst.remove(colour)
+        goal_types = [PerimeterGoal(colour), BlobGoal(colour)]
+        goals.append(random.choice(goal_types))
     return goals
 
 
@@ -62,7 +62,26 @@ def flatten(block: Block) -> list[list[tuple[int, int, int]]]:
 
     L[0][0] represents the unit cell in the upper left corner of the Block.
     """
-    # TODO: Implement this function]
+    # Implement this function
+    rslt = []
+    if block.level == block.max_depth:
+        return [[block.colour]]
+    else:
+        block_cpy = block.create_copy()
+        block_cpy.smash_same_color()
+        left_up = flatten(block_cpy.children[1])
+        right_up = flatten(block_cpy.children[0])
+        left_down = flatten(block_cpy.children[2])
+        right_down = flatten(block_cpy.children[3])
+        # extend each column of left_up with each column of left_down
+        # extend each column of right_up with each column of right_down
+        n = 2 ** (block_cpy.max_depth - block_cpy.level)
+        for i in range(n // 2):
+            rslt.append(left_up[i] + left_down[i])
+
+        for i in range(n // 2):
+            rslt.append(right_up[i] + right_down[i])
+    return rslt
 
 
 class Goal:
@@ -108,23 +127,30 @@ class PerimeterGoal(Goal):
         on the perimeter whose colour is this goal's target colour. Corner cells
         count twice toward the score.
         """
-        # TODO: Implement this method
-        perimeter_cells = board.perimeter_cells()
-        target_colour = self.colour
+        #  Implement this method
+        flat_board = flatten(board)
+        size = 2 ** (board.max_depth - board.level)
         score = 0
-        for cell in perimeter_cells:
-            if board.get_cell_colour(*cell) == target_colour:
-                if board.is_corner_cell(*cell):
-                    score += 2
-                else:
-                    score += 1
+        for i in range(size):
+            for j in range(size):
+                # check if the cell is on the perimeter
+                is_on_perimeter = (i == 0 or i == size - 1 or j == 0
+                                   or j == size - 1)
+                if is_on_perimeter and flat_board[i][j] == self.colour:
+                    # check if the cell is a corner cell
+                    is_corner = ((i == 0 and j == 0) or (i == 0
+                                                         and j == size - 1)
+                                 or (i == size - 1 and j == 0)
+                                 or (i == size - 1 and j == size - 1))
+                    score += 2 if is_corner else 1
+
         return score
 
     def description(self) -> str:
         """Return a description of this goal.
         """
-        # TODO: Implement this method
-        return 'DESCRIPTION'  # FIXME
+        # Implement this method
+        return f'Perimeter Goal: {colour_name(self.colour)}'
 
 
 class BlobGoal(Goal):
@@ -140,8 +166,18 @@ class BlobGoal(Goal):
         The score for a BlobGoal is defined to be the total number of
         unit cells in the largest connected blob within this Block.
         """
-        # TODO: Implement this method
-        return 148  # FIXME
+        # Implement this method
+        flat_board = flatten(board)
+        visited = [[-1 for _ in range(2 ** (board.max_depth - board.level))]
+                   for _ in range(2 ** (board.max_depth - board.level))]
+        max_size = 0
+        for i in range(2 ** (board.max_depth - board.level)):
+            for j in range(2 ** (board.max_depth - board.level)):
+                if visited[i][j] == -1:
+                    size = self._undiscovered_blob_size((i, j), flat_board,
+                                                        visited)
+                    max_size = max(max_size, size)
+        return max_size
 
     def _undiscovered_blob_size(self, pos: tuple[int, int],
                                 board: list[list[tuple[int, int, int]]],
@@ -164,13 +200,35 @@ class BlobGoal(Goal):
 
         If <pos> is out of bounds for <board>, return 0.
         """
-        # TODO: Implement this method
+        # Implement this method
+        size = 0
+        #  check if the cell is out of bounds
+        if pos[0] < 0 or pos[0] >= len(board) or pos[1] < 0 or pos[1] >= len(
+                board):
+            return 0
+        # check if the cell is visited
+        if visited[pos[0]][pos[1]] == 1:
+            return 0
+
+        # check if the cell is not of the target colour
+        visited[pos[0]][pos[1]] = 1
+        if board[pos[0]][pos[1]] == self.colour:
+            size += 1
+            size += self._undiscovered_blob_size((pos[0] - 1, pos[1]), board,
+                                                 visited)
+            size += self._undiscovered_blob_size((pos[0] + 1, pos[1]), board,
+                                                 visited)
+            size += self._undiscovered_blob_size((pos[0], pos[1] - 1), board,
+                                                 visited)
+            size += self._undiscovered_blob_size((pos[0], pos[1] + 1), board,
+                                                 visited)
+        return size
 
     def description(self) -> str:
         """Return a description of this goal.
         """
-        # TODO: Implement this method
-        return 'DESCRIPTION'  # FIXME
+        # Implement this method
+        return f'Blob Goal: {colour_name(self.colour)}'
 
 
 if __name__ == '__main__':

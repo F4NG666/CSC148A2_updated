@@ -51,25 +51,29 @@ def create_players(num_human: int, num_random: int, smart_players: list[int]) \
 
     Each player is assigned a random goal.
     """
-    # TODO: Implement this function
+    # Implement this function
+    # generate goals
+    goals = generate_goals(num_human + num_random + len(smart_players))
     players = []
-    total_players = num_human + num_random + len(smart_players)
-    goals = generate_goals(total_players)
-
-    # Create HumanPlayer objects
+    # create players
     for i in range(num_human):
         players.append(HumanPlayer(i, goals[i]))
-
-    # Create RandomPlayer objects
+    # create random players
     for i in range(num_random):
         players.append(RandomPlayer(i + num_human, goals[i + num_human]))
-
-    # Create SmartPlayer objects
-    for i, difficulty in enumerate(smart_players):
-        player_id = i + num_human + num_random
-        players.append(SmartPlayer(player_id, goals[player_id], difficulty))
-
+    # create smart players
+    for i in range(len(smart_players)):
+        players.append(SmartPlayer(i + num_human + num_random,
+                                   goals[i + num_human + num_random],
+                                   smart_players[i]))
     return players
+
+
+def _contain_location(block: Block, location: tuple[int, int]) -> bool:
+    """Return True if <location> is within <block>, False otherwise."""
+
+    return block.position[0] <= location[0] < block.position[0] + block.size \
+        and block.position[1] <= location[1] < block.position[1] + block.size
 
 
 def _get_block(block: Block, location: tuple[int, int], level: int) -> \
@@ -90,7 +94,15 @@ def _get_block(block: Block, location: tuple[int, int], level: int) -> \
     Preconditions:
         - block.level <= level <= block.max_depth
     """
-    # TODO: Implement this function
+    # Implement this function
+    # get blocks in self.children that at the level
+    if level == block.level and _contain_location(block, location):
+        return block
+    else:
+        for child in block.children:
+            if _contain_location(child, location):
+                return _get_block(child, location, level)
+    return None
 
 
 class Player:
@@ -259,8 +271,31 @@ class RandomPlayer(ComputerPlayer):
         performed on the <board>.
 
         This function does not mutate <board>.
+
+         The attribute _proceed is initially False and will become True only
+         when the user clicks the mouse during the computer’s turn. Then,
+         ComputerPlayer.generate_move() will proceed to make a move. Once a
+         move is determined, you must set the _proceed attribute back to
+         False so that the next time it is this computer’s turn, the computer
+         will wait for a mouse click again.
         """
-        # TODO: Implement this method
+        # Implement this method
+        if self._proceed:
+            actions = [ROTATE_CLOCKWISE, ROTATE_COUNTER_CLOCKWISE,
+                       SWAP_HORIZONTAL, SWAP_VERTICAL, SMASH, PAINT, COMBINE]
+            block = random.choice(board.children).create_copy()
+            action = random.choice(actions)
+            move = action, block
+            colors = [(255, 211, 92), (199, 44, 58), (1, 128, 181),
+                      (138, 151, 71)]
+            extra_info = {'colour': random.choice(colors)}
+            while action.apply(block, extra_info) is False:
+                block = random.choice(board.children).create_copy()
+                action = random.choice(actions)
+                move = action, block
+            self._proceed = False
+            return move
+        return None
 
 
 class SmartPlayer(ComputerPlayer):
@@ -284,9 +319,9 @@ class SmartPlayer(ComputerPlayer):
         Preconditions:
         - difficulty >= 0
         """
-        # TODO: Implement this method
-        super().__init__(player_id, goal)
-        self.difficulty = difficulty
+        # Implement this method
+        ComputerPlayer.__init__(self, player_id, goal)
+        self._num_test = difficulty
 
     def generate_move(self, board: Block) -> \
             tuple[Action, Block] | None:
@@ -300,8 +335,42 @@ class SmartPlayer(ComputerPlayer):
         the current score, this player will pass.
 
         This method does not mutate <board>.
+
+         SmartPlayer will make moves on the board by completing the
+         SmartPlayer.generate_move method. A SmartPlayer randomly generates n
+         valid moves, where n is the SmartPlayer ’s difficulty value. It then
+         picks the move that yields the best score taking into account the
+         cost to perform that action Action.penalty. When scoring each of
+         the valid moves, you must not mutate the given board board
+         parameter. The SmartPlayer must create a copy of the board for each
+         move it wants to assess. Once you have a copy, you can mutate that
+         copy by applying the move on it. If no best move was found and the
+         current score is best, the SmartPlayer should pass.
         """
-        # TODO: Implement this method
+        # Implement this method
+        if not self._proceed:
+            return None
+
+        actions = [ROTATE_CLOCKWISE, ROTATE_COUNTER_CLOCKWISE,
+                   SWAP_HORIZONTAL, SWAP_VERTICAL, SMASH, PAINT, COMBINE]
+        best_score = self.goal.score(board)
+        best_move = None
+        for _ in range(self._num_test):
+            block = random.choice(board.children).create_copy()
+            action = random.choice(actions)
+            move = action, block
+            colors = [(255, 211, 92), (199, 44, 58), (1, 128, 181),
+                      (138, 151, 71)]
+            extra_info = {'colour': random.choice(colors)}
+            if action.apply(block, extra_info):
+                score = self.goal.score(block)
+                if score - action.penalty > best_score:
+                    best_score = score - action.penalty
+                    best_move = move
+        self._proceed = False
+        if best_move is not None:
+            return best_move
+        return PASS, board
 
 
 if __name__ == '__main__':
